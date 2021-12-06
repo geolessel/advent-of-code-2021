@@ -61,48 +61,59 @@ Find a way to simulate lanternfish. **How many lanternfish would there be after 
 <!-- livebook:{"reevaluate_automatically":true} -->
 
 ```elixir
-defmodule Fish do
-  defstruct [:timer]
-
-  def simulate_day(fish) do
-    Map.update(fish, :timer, 8, &(&1 - 1))
-  end
-end
-
 defmodule Ocean do
-  defstruct fish: []
+  defstruct fish: %{8 => 0, 7 => 0, 6 => 0, 5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0, 0 => 0}
 
   def add_fish(ocean, timer) do
-    Map.update(ocean, :fish, [], &[%Fish{timer: timer} | &1])
+    Map.update(ocean, :fish, %{}, fn fish -> Map.update(fish, timer, 0, &(&1 + 1)) end)
+  end
+
+  def simulate_days(ocean, count) do
+    Enum.reduce(1..count, ocean, fn _i, ocean ->
+      Ocean.simulate_day(ocean)
+    end)
   end
 
   def simulate_day(ocean) do
     ocean
-    |> age_fish()
     |> spawn_fish()
-    |> reset_timers()
+    |> age_fish()
+  end
+
+  def count_fish(%Ocean{fish: fish}) do
+    Enum.reduce(fish, 0, fn
+      {9, _}, acc -> acc
+      {_key, val}, acc -> acc + val
+    end)
   end
 
   defp age_fish(ocean) do
-    Map.update(ocean, :fish, [], fn fish ->
-      Enum.map(fish, &Fish.simulate_day/1)
-    end)
+    fish =
+      ocean.fish
+      |> Map.put(0, Map.get(ocean.fish, 1))
+      |> Map.put(1, Map.get(ocean.fish, 2))
+      |> Map.put(2, Map.get(ocean.fish, 3))
+      |> Map.put(3, Map.get(ocean.fish, 4))
+      |> Map.put(4, Map.get(ocean.fish, 5))
+      |> Map.put(5, Map.get(ocean.fish, 6))
+      |> Map.put(6, Map.get(ocean.fish, 7))
+      |> Map.put(7, Map.get(ocean.fish, 8))
+      |> Map.put(8, Map.get(ocean.fish, 9))
+
+    Map.put(ocean, :fish, fish)
   end
 
   defp spawn_fish(ocean) do
-    Enum.reduce(ocean.fish, ocean, fn
-      %Fish{timer: -1}, ocean -> add_fish(ocean, 8)
-      _, ocean -> ocean
-    end)
-  end
+    fish_count =
+      ocean.fish
+      |> Map.get(0)
 
-  defp reset_timers(ocean) do
-    Map.update(ocean, :fish, [], fn fishes ->
-      Enum.map(fishes, fn
-        %Fish{timer: -1} = fish -> Map.put(fish, :timer, 6)
-        fish -> fish
-      end)
-    end)
+    fish =
+      ocean.fish
+      |> Map.put(9, fish_count)
+      |> Map.update(7, 0, &(&1 + fish_count))
+
+    Map.put(ocean, :fish, fish)
   end
 end
 ```
@@ -124,11 +135,9 @@ input =
 ```elixir
 ocean = Enum.reduce(input, %Ocean{}, fn timer, ocean -> Ocean.add_fish(ocean, timer) end)
 
-Enum.reduce(1..80, ocean, fn _i, ocean ->
-  Ocean.simulate_day(ocean)
-end)
-|> Map.get(:fish)
-|> Enum.count()
+ocean
+|> Ocean.simulate_days(80)
+|> Ocean.count_fish()
 ```
 
 <!-- livebook:{"branch_parent_index":0} -->
@@ -141,12 +150,12 @@ After `256` days in the example above, there would be a total of `26984457539` l
 
 **How many lanternfish would there be after `256` days?**
 
+<!-- livebook:{"reevaluate_automatically":true} -->
+
 ```elixir
 ocean = Enum.reduce(input, %Ocean{}, fn timer, ocean -> Ocean.add_fish(ocean, timer) end)
 
-Enum.reduce(1..1, ocean, fn _i, ocean ->
-  Ocean.simulate_day(ocean)
-end)
-|> Map.get(:fish)
-|> Enum.count()
+ocean
+|> Ocean.simulate_days(256)
+|> Ocean.count_fish()
 ```
