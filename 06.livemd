@@ -56,7 +56,7 @@ In this example, after 18 days, there are a total of `26` fish. After 80 days, t
 
 Find a way to simulate lanternfish. **How many lanternfish would there be after 80 days?**
 
-<!-- livebook:{"livebook_object":"cell_input","name":"Puzzle input","props":{"options":["Test","Real"]},"type":"select","value":"Test"} -->
+<!-- livebook:{"livebook_object":"cell_input","name":"Puzzle input","props":{"options":["Test","Real"]},"type":"select","value":"Real"} -->
 
 <!-- livebook:{"reevaluate_automatically":true} -->
 
