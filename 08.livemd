@@ -126,7 +126,11 @@ defmodule Segment do
 
   def unique?(input), do: String.length(input) in [2, 3, 4, 7]
 end
+```
 
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
 Enum.reduce(input, 0, fn line, count -> count + Segment.unique_count(line) end)
 ```
 
@@ -190,3 +194,252 @@ Following this same process for each entry in the second, larger example above, 
 Adding all of the output values in this larger example produces **`61229`**.
 
 For each entry, determine all of the wire/segment connections and decode the four-digit output values. **What do you get if you add up all of the output values?**
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+defmodule Segment do
+  @characters MapSet.new(["a", "b", "c", "d", "e", "f", "g"])
+  #  0000
+  # 6    1
+  # 6    1
+  #  5555
+  # 4    2
+  # 4    2
+  #  3333
+  defstruct outputs: %{
+              0 => MapSet.new(),
+              1 => MapSet.new(),
+              2 => MapSet.new(),
+              3 => MapSet.new(),
+              4 => MapSet.new(),
+              5 => MapSet.new(),
+              6 => MapSet.new()
+            },
+            possibilities: %{
+              0 => @characters,
+              1 => @characters,
+              2 => @characters,
+              3 => @characters,
+              4 => @characters,
+              5 => @characters,
+              6 => @characters
+            },
+            lengths: %{},
+            output: ""
+
+  def setup([pattern, output]) do
+    pattern
+    |> String.split(" ", trim: true)
+    |> Enum.reduce(%Segment{}, fn input, segment ->
+      letters = String.split(input, "", trim: true)
+
+      outputs =
+        case length(letters) do
+          # 1
+          2 ->
+            segment.outputs
+            |> Map.put(1, MapSet.new(letters))
+
+          # 7
+          3 ->
+            segment.outputs
+            |> Map.put(7, MapSet.new(letters))
+
+          # 4
+          4 ->
+            segment.outputs
+            |> Map.put(4, MapSet.new(letters))
+
+          7 ->
+            segment.outputs
+            |> Map.put(8, MapSet.new(letters))
+
+          _ ->
+            segment.outputs
+        end
+
+      lengths =
+        segment.lengths
+        |> Map.update(length(letters), [letters], &[letters | &1])
+
+      Map.put(segment, :outputs, outputs)
+      |> Map.put(:lengths, lengths)
+      |> Map.put(
+        :output,
+        String.split(output, " ", trim: true)
+        |> Enum.reduce([], &[MapSet.new(String.split(&1, "", trim: true)) | &2])
+      )
+    end)
+  end
+
+  def deduce(%Segment{} = segment) do
+    possibilities =
+      segment.possibilities
+      |> Map.put(
+        0,
+        MapSet.difference(
+          Map.get(segment.outputs, 7),
+          Map.get(segment.outputs, 1)
+        )
+      )
+      |> Map.put(
+        6,
+        MapSet.difference(
+          Map.get(segment.outputs, 4),
+          Map.get(segment.outputs, 7)
+        )
+      )
+      |> Map.put(
+        5,
+        MapSet.difference(
+          Map.get(segment.outputs, 4),
+          Map.get(segment.outputs, 7)
+        )
+      )
+      |> Map.put(
+        3,
+        MapSet.difference(
+          Map.get(segment.outputs, 8),
+          MapSet.union(
+            Map.get(segment.outputs, 7),
+            Map.get(segment.outputs, 4)
+          )
+        )
+      )
+      |> Map.put(
+        4,
+        MapSet.difference(
+          Map.get(segment.outputs, 8),
+          MapSet.union(
+            Map.get(segment.outputs, 7),
+            Map.get(segment.outputs, 4)
+          )
+        )
+      )
+
+    ## deal with 9, 6, and 0
+    possibilities =
+      List.flatten(Map.get(segment.lengths, 6))
+      |> Enum.frequencies()
+      |> Enum.filter(fn {_key, count} -> count > 2 end)
+      |> Enum.reduce(possibilities, fn {letter, _count}, acc ->
+        Map.update(acc, 1, "", &MapSet.delete(&1, letter))
+        |> Map.update(4, "", &MapSet.delete(&1, letter))
+        |> Map.update(5, "", &MapSet.delete(&1, letter))
+      end)
+
+    possibilities =
+      possibilities
+      |> Map.update(6, MapSet.new(), &MapSet.difference(&1, Map.get(possibilities, 5)))
+      |> Map.update(3, MapSet.new(), &MapSet.difference(&1, Map.get(possibilities, 4)))
+
+    possibilities =
+      possibilities
+      |> Map.update(1, MapSet.new(), fn one ->
+        MapSet.difference(
+          one,
+          possibilities
+          |> Map.get(0)
+          |> MapSet.union(Map.get(possibilities, 3))
+          |> MapSet.union(Map.get(possibilities, 4))
+          |> MapSet.union(Map.get(possibilities, 5))
+          |> MapSet.union(Map.get(possibilities, 6))
+        )
+      end)
+
+    possibilities =
+      possibilities
+      |> Map.update(2, MapSet.new(), fn one ->
+        MapSet.difference(
+          one,
+          possibilities
+          |> Map.get(0)
+          |> MapSet.union(Map.get(possibilities, 1))
+          |> MapSet.union(Map.get(possibilities, 3))
+          |> MapSet.union(Map.get(possibilities, 4))
+          |> MapSet.union(Map.get(possibilities, 5))
+          |> MapSet.union(Map.get(possibilities, 6))
+        )
+      end)
+
+    outputs =
+      segment.outputs
+      |> Map.put(
+        0,
+        MapSet.union(
+          Map.get(possibilities, 0),
+          Map.get(possibilities, 1)
+        )
+        |> MapSet.union(Map.get(possibilities, 2))
+        |> MapSet.union(Map.get(possibilities, 3))
+        |> MapSet.union(Map.get(possibilities, 4))
+        |> MapSet.union(Map.get(possibilities, 6))
+      )
+      |> Map.put(
+        2,
+        Map.get(possibilities, 0)
+        |> MapSet.union(Map.get(possibilities, 1))
+        |> MapSet.union(Map.get(possibilities, 5))
+        |> MapSet.union(Map.get(possibilities, 4))
+        |> MapSet.union(Map.get(possibilities, 3))
+      )
+      |> Map.put(
+        3,
+        Map.get(possibilities, 0)
+        |> MapSet.union(Map.get(possibilities, 1))
+        |> MapSet.union(Map.get(possibilities, 5))
+        |> MapSet.union(Map.get(possibilities, 2))
+        |> MapSet.union(Map.get(possibilities, 3))
+      )
+      |> Map.put(
+        5,
+        Map.get(possibilities, 0)
+        |> MapSet.union(Map.get(possibilities, 6))
+        |> MapSet.union(Map.get(possibilities, 5))
+        |> MapSet.union(Map.get(possibilities, 2))
+        |> MapSet.union(Map.get(possibilities, 3))
+      )
+      |> Map.put(
+        6,
+        Map.get(possibilities, 0)
+        |> MapSet.union(Map.get(possibilities, 6))
+        |> MapSet.union(Map.get(possibilities, 5))
+        |> MapSet.union(Map.get(possibilities, 2))
+        |> MapSet.union(Map.get(possibilities, 3))
+        |> MapSet.union(Map.get(possibilities, 4))
+      )
+      |> Map.put(
+        9,
+        Map.get(possibilities, 0)
+        |> MapSet.union(Map.get(possibilities, 1))
+        |> MapSet.union(Map.get(possibilities, 2))
+        |> MapSet.union(Map.get(possibilities, 3))
+        |> MapSet.union(Map.get(possibilities, 6))
+        |> MapSet.union(Map.get(possibilities, 5))
+      )
+
+    segment
+    |> Map.put(:possibilities, possibilities)
+    |> Map.put(:outputs, outputs)
+  end
+
+  def get_output_value(%Segment{output: output, outputs: outputs}) do
+    Enum.reduce(output, "", fn o, value ->
+      {val, _} = Enum.find(outputs, fn {_val, o2} -> o == o2 end)
+      "#{value}#{val}"
+    end)
+    |> String.reverse()
+    |> String.to_integer()
+  end
+end
+
+input
+|> Enum.map(fn line ->
+  line
+  |> Segment.setup()
+  |> Segment.deduce()
+  |> Segment.get_output_value()
+end)
+|> Enum.sum()
+```
